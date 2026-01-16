@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>登录 / 注册 - 四位数对决</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600;700&family=Noto+Serif+SC:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/auth.css" />
+  </head>
+  <body>
+    <main class="page">
+      <nav class="nav">
+        <div class="logo">四位数对决</div>
+        <div class="nav-links">
+          <a href="index.html">返回首页</a>
+        </div>
+      </nav>
+
+      <section class="auth-layout">
+        <div class="card">
+          <h1 class="section-title">进入对局</h1>
+          <p class="muted">
+            邮箱可选填写，用户名与密码必填。注册后可保存战绩与昵称。
+          </p>
+          <div class="auth-toggle" role="tablist">
+            <button id="toggleLogin" class="active" type="button">登录</button>
+            <button id="toggleRegister" type="button">注册</button>
+          </div>
+        </div>
+
+        <div class="card auth-card">
+          <form id="loginForm" class="auth-form">
+            <label>用户名</label>
+            <input class="input" name="username" required />
+            <label>密码</label>
+            <input class="input" name="password" type="password" required />
+            <button class="btn primary" type="submit">登录</button>
+          </form>
+
+          <form id="registerForm" class="auth-form" hidden>
+            <label>用户名</label>
+            <input class="input" name="username" required />
+            <label>密码</label>
+            <input class="input" name="password" type="password" required />
+            <label>邮箱（可选）</label>
+            <input class="input" name="email" type="email" />
+            <label>手机号（可选）</label>
+            <input class="input" name="phone" />
+            <button class="btn primary" type="submit">创建账号</button>
+          </form>
+
+          <div id="authNotice" class="notice"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="scripts/auth.js"></script>
+  </body>
+</html>

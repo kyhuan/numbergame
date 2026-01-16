@@ -1,0 +1,47 @@
+.auth-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.auth-card {
+  display: grid;
+  gap: 12px;
+}
+
+.auth-toggle {
+  display: inline-flex;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  padding: 6px;
+  border: 1px solid var(--line);
+}
+
+.auth-toggle button {
+  border: none;
+  background: transparent;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.auth-toggle button.active {
+  background: var(--ink);
+  color: #fff;
+}
+
+.auth-form {
+  display: grid;
+  gap: 12px;
+}
+
+.auth-form label {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.notice {
+  font-size: 0.9rem;
+  color: var(--muted);
+}

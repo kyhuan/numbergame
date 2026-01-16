@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>对局中 - 四位数对决</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600;700&family=Noto+Serif+SC:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/game.css" />
+  </head>
+  <body>
+    <main class="page">
+      <nav class="nav">
+        <div class="logo">四位数对决</div>
+        <div class="nav-links">
+          <a href="lobby.html">大厅</a>
+          <a href="profile.html">个人资料</a>
+          <button id="logoutBtn" type="button">退出</button>
+        </div>
+      </nav>
+
+      <section class="card">
+        <div class="status-box">
+          <div class="pill">房间码：<span id="roomCode">----</span></div>
+          <div class="pill">状态：<span id="roomStatus">等待中</span></div>
+          <div class="pill">你是：<span id="playerLabel">玩家</span></div>
+        </div>
+        <div class="dice-panel">
+          <div class="dice-values">
+            <div>
+              <span class="muted">玩家1</span>
+              <strong id="diceP1">-</strong>
+            </div>
+            <div>
+              <span class="muted">玩家2</span>
+              <strong id="diceP2">-</strong>
+            </div>
+          </div>
+          <button id="rollDice" class="btn ghost">掷骰子</button>
+        </div>
+      </section>
+
+      <section class="game-layout">
+        <div class="grid">
+          <div class="card">
+            <h2 class="section-title">你的秘密数字</h2>
+            <p class="muted">输入四位数字，锁定后不可更改。</p>
+            <div class="digit-row" id="secretRow">
+              <input class="input digit" maxlength="1" inputmode="numeric" />
+              <input class="input digit" maxlength="1" inputmode="numeric" />
+              <input class="input digit" maxlength="1" inputmode="numeric" />
+              <input class="input digit" maxlength="1" inputmode="numeric" />
+            </div>
+            <button id="lockSecret" class="btn primary">锁定秘密</button>
+            <div class="pill" id="secretStatus">未准备</div>
+          </div>
+
+          <div class="card">
+            <h2 class="section-title">发起猜测</h2>
+            <p class="muted">轮到你时才能提交猜测。</p>
+            <div class="digit-row" id="guessRow">
+              <input class="input digit" maxlength="1" inputmode="numeric" />
+              <input class="input digit" maxlength="1" inputmode="numeric" />
+              <input class="input digit" maxlength="1" inputmode="numeric" />
+              <input class="input digit" maxlength="1" inputmode="numeric" />
+            </div>
+            <button id="submitGuess" class="btn">提交猜测</button>
+            <div class="pill" id="turnStatus">等待开始</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="status-box">
+            <h2 class="section-title">对局记录</h2>
+            <button id="resetGame" class="btn ghost">重置</button>
+          </div>
+          <div id="log" class="log"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="scripts/api.js"></script>
+    <script src="scripts/game.js"></script>
+  </body>
+</html>

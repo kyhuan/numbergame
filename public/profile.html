@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>个人资料 - 四位数对决</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600;700&family=Noto+Serif+SC:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/profile.css" />
+  </head>
+  <body>
+    <main class="page">
+      <nav class="nav">
+        <div class="logo">四位数对决</div>
+        <div class="nav-links">
+          <a href="lobby.html">大厅</a>
+          <a href="profile.html" class="active">个人资料</a>
+          <button id="logoutBtn" type="button">退出</button>
+        </div>
+      </nav>
+
+      <section class="profile-grid">
+        <div class="card profile-card">
+          <h1 class="section-title">个人资料</h1>
+          <div id="avatarPreview" class="avatar"></div>
+          <label class="muted">昵称</label>
+          <input id="nickname" class="input" />
+          <label class="muted">邮箱</label>
+          <input id="email" class="input" type="email" />
+          <label class="muted">手机号</label>
+          <input id="phone" class="input" />
+          <label class="muted">头像链接</label>
+          <input id="avatarUrl" class="input" placeholder="https://..." />
+          <label class="muted">个性签名</label>
+          <input id="signature" class="input" maxlength="60" />
+          <button id="saveProfile" class="btn primary">保存修改</button>
+          <div id="profileNotice" class="notice"></div>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">战绩统计</h2>
+          <div class="stat-grid" id="statGrid"></div>
+          <h2 class="section-title">最近战报</h2>
+          <div id="historyList" class="history-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="scripts/api.js"></script>
+    <script src="scripts/profile.js"></script>
+  </body>
+</html>

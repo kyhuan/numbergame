@@ -1,0 +1,60 @@
+.hero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  align-items: center;
+}
+
+.hero h1 {
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: clamp(2.4rem, 4vw, 3.4rem);
+  margin: 0 0 12px;
+}
+
+.hero p {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.hero-card {
+  background: linear-gradient(135deg, rgba(240, 93, 35, 0.12), rgba(47, 112, 108, 0.12));
+  border-radius: 24px;
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.hero-card strong {
+  font-size: 2rem;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.feature {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 20px;
+  padding: 18px;
+  border: 1px solid rgba(28, 27, 31, 0.08);
+}
+
+.cta-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.step {
+  border-left: 3px solid var(--accent);
+  padding-left: 12px;
+}
