@@ -1,0 +1,39 @@
+.admin-login {
+  max-width: 420px;
+}
+
+.admin-card textarea.input {
+  resize: vertical;
+}
+
+.admin-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.admin-item {
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(28, 27, 31, 0.06);
+  display: grid;
+  gap: 6px;
+}
+
+.admin-item strong {
+  font-weight: 600;
+}
+
+.admin-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+}

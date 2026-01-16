@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>后台管理 - 四位数对决</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600;700&family=Noto+Serif+SC:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/admin.css" />
+  </head>
+  <body>
+    <main class="page">
+      <nav class="nav">
+        <div class="logo">四位数对决 · 后台</div>
+        <div class="nav-links">
+          <button id="adminLogout" type="button">退出</button>
+        </div>
+      </nav>
+
+      <section id="loginCard" class="card admin-login">
+        <h1 class="section-title">管理员登录</h1>
+        <div class="stack">
+          <input id="adminUser" class="input" placeholder="管理员账号" />
+          <input id="adminPass" class="input" type="password" placeholder="管理员密码" />
+          <button id="adminLogin" class="btn primary">登录</button>
+          <div id="adminNotice" class="notice"></div>
+        </div>
+      </section>
+
+      <section id="dashboard" class="stack" hidden>
+        <div class="card admin-card">
+          <h2 class="section-title">系统广播</h2>
+          <div class="stack">
+            <input id="broadcastInput" class="input" placeholder="系统消息内容" />
+            <button id="broadcastBtn" class="btn">发送广播</button>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card admin-card">
+            <h2 class="section-title">用户管理</h2>
+            <div class="stack">
+              <input id="userSearch" class="input" placeholder="搜索用户名/昵称/邮箱" />
+              <button id="userSearchBtn" class="btn ghost">搜索</button>
+            </div>
+            <div id="userList" class="admin-list"></div>
+          </div>
+
+          <div class="card admin-card">
+            <h2 class="section-title">公告管理</h2>
+            <div class="stack">
+              <input id="announcementTitle" class="input" placeholder="公告标题" />
+              <textarea id="announcementBody" class="input" rows="3" placeholder="公告内容"></textarea>
+              <label class="muted">
+                <input type="checkbox" id="announcementActive" checked /> 启用
+              </label>
+              <button id="announcementCreate" class="btn primary">发布公告</button>
+            </div>
+            <div id="announcementList" class="admin-list"></div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card admin-card">
+            <h2 class="section-title">对局管理</h2>
+            <div id="matchList" class="admin-list"></div>
+          </div>
+
+          <div class="card admin-card">
+            <h2 class="section-title">房间监控</h2>
+            <div id="roomList" class="admin-list"></div>
+          </div>
+        </div>
+
+        <div class="card admin-card">
+          <h2 class="section-title">操作日志</h2>
+          <div id="adminLogs" class="admin-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="scripts/admin.js"></script>
+  </body>
+</html>

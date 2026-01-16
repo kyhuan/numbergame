@@ -6,6 +6,7 @@ const joinRoomBtn = document.getElementById("joinRoom");
 const roomCodeInput = document.getElementById("roomCode");
 const roomList = document.getElementById("roomList");
 const historyList = document.getElementById("historyList");
+const announcementList = document.getElementById("announcementList");
 const logoutBtn = document.getElementById("logoutBtn");
 
 const statusLabels = {
@@ -85,6 +86,23 @@ function renderAvatar(nickname, avatarUrl) {
   avatarPreview.appendChild(fallback);
 }
 
+function renderAnnouncements(announcements) {
+  announcementList.innerHTML = "";
+  if (!announcements.length) {
+    announcementList.textContent = "暂无公告。";
+    return;
+  }
+  announcements.forEach((item) => {
+    const entry = document.createElement("div");
+    entry.className = "history-item";
+    entry.innerHTML = `
+      <strong>${item.title}</strong>
+      <div class="muted">${item.body}</div>
+    `;
+    announcementList.appendChild(entry);
+  });
+}
+
 async function loadLobby() {
   const user = await requireAuth();
   if (!user) {
@@ -93,8 +111,12 @@ async function loadLobby() {
   nicknameEl.textContent = user.nickname || user.username;
   signatureEl.textContent = user.signature || "准备开局？创建房间或加入好友。";
   renderAvatar(user.nickname || user.username, user.avatarUrl || "");
-  const historyData = await fetchJson("/api/history");
+  const [historyData, announcementData] = await Promise.all([
+    fetchJson("/api/history"),
+    fetchJson("/api/announcements"),
+  ]);
   renderHistory(historyData.matches || [], user.id);
+  renderAnnouncements(announcementData.announcements || []);
   async function refreshRooms() {
     try {
       const roomsData = await fetchJson("/api/rooms");

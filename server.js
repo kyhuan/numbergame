@@ -10,6 +10,9 @@ const WebSocket = require("ws");
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
 const TOKEN_COOKIE = "token";
+const ADMIN_COOKIE = "admin_token";
+const DEFAULT_ADMIN_USERNAME = "admin";
+const DEFAULT_ADMIN_PASSWORD = "admin";
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
@@ -72,7 +75,35 @@ async function initDb() {
       nickname TEXT,
       avatar_url TEXT,
       signature TEXT,
+      status TEXT DEFAULT 'active',
       created_at TEXT NOT NULL
+    )`
+  );
+  await run(
+    `CREATE TABLE IF NOT EXISTS admin_users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )`
+  );
+  await run(
+    `CREATE TABLE IF NOT EXISTS announcements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      active INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL
+    )`
+  );
+  await run(
+    `CREATE TABLE IF NOT EXISTS admin_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      admin_id INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      detail TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY(admin_id) REFERENCES admin_users(id)
     )`
   );
   await run(
@@ -103,6 +134,28 @@ async function initDb() {
   await addColumn("nickname", "nickname TEXT");
   await addColumn("avatar_url", "avatar_url TEXT");
   await addColumn("signature", "signature TEXT");
+  await addColumn("status", "status TEXT DEFAULT 'active'");
+
+  const adminCount = await get("SELECT COUNT(*) as count FROM admin_users");
+  if (adminCount && adminCount.count === 0) {
+    const adminUser = process.env.ADMIN_USERNAME || DEFAULT_ADMIN_USERNAME;
+    const adminPass = process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
+    if (adminUser && adminPass) {
+      const passwordHash = await bcrypt.hash(adminPass, 10);
+      await run(
+        `INSERT INTO admin_users (username, password_hash, created_at)
+         VALUES (?, ?, ?)`,
+        [adminUser, passwordHash, nowIso()]
+      );
+      // eslint-disable-next-line no-console
+      console.log("Admin account created from env.");
+    } else {
+      // eslint-disable-next-line no-console
+      console.log(
+        "No admin account found. Set ADMIN_USERNAME and ADMIN_PASSWORD."
+      );
+    }
+  }
 }
 
 function sanitizeUser(user) {
@@ -117,6 +170,7 @@ function sanitizeUser(user) {
     nickname: user.nickname || user.username,
     avatarUrl: user.avatar_url || "",
     signature: user.signature || "",
+    status: user.status || "active",
     createdAt: user.created_at,
   };
 }
@@ -127,7 +181,13 @@ function signToken(user) {
   });
 }
 
-function authRequired(req, res, next) {
+function signAdminToken(admin) {
+  return jwt.sign({ id: admin.id, username: admin.username }, JWT_SECRET, {
+    expiresIn: "7d",
+  });
+}
+
+async function authRequired(req, res, next) {
   const token = req.cookies[TOKEN_COOKIE];
   if (!token) {
     res.status(401).json({ error: "未登录" });
@@ -135,7 +195,39 @@ function authRequired(req, res, next) {
   }
   try {
     const payload = jwt.verify(token, JWT_SECRET);
+    const user = await get("SELECT * FROM users WHERE id = ?", [payload.id]);
+    if (!user) {
+      res.status(401).json({ error: "账号不存在" });
+      return;
+    }
+    if (user.status === "banned") {
+      res.status(403).json({ error: "账号已被禁用" });
+      return;
+    }
     req.user = payload;
+    req.userRow = user;
+    next();
+  } catch (error) {
+    res.status(401).json({ error: "登录已过期" });
+  }
+}
+
+async function adminRequired(req, res, next) {
+  const token = req.cookies[ADMIN_COOKIE];
+  if (!token) {
+    res.status(401).json({ error: "未登录" });
+    return;
+  }
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    const admin = await get("SELECT * FROM admin_users WHERE id = ?", [
+      payload.id,
+    ]);
+    if (!admin) {
+      res.status(401).json({ error: "账号不存在" });
+      return;
+    }
+    req.admin = admin;
     next();
   } catch (error) {
     res.status(401).json({ error: "登录已过期" });
@@ -219,8 +311,7 @@ app.post("/api/logout", (req, res) => {
 });
 
 app.get("/api/me", authRequired, async (req, res) => {
-  const user = await get("SELECT * FROM users WHERE id = ?", [req.user.id]);
-  res.json({ user: sanitizeUser(user) });
+  res.json({ user: sanitizeUser(req.userRow) });
 });
 
 app.patch("/api/me", authRequired, async (req, res) => {
@@ -265,6 +356,16 @@ app.get("/api/history", authRequired, async (req, res) => {
     guesses: row.guesses ? JSON.parse(row.guesses) : [],
   }));
   res.json({ matches: data });
+});
+
+app.get("/api/announcements", async (req, res) => {
+  const rows = await all(
+    `SELECT id, title, body, active, created_at
+     FROM announcements WHERE active = 1
+     ORDER BY created_at DESC
+     LIMIT 20`
+  );
+  res.json({ announcements: rows });
 });
 
 const server = http.createServer(app);
@@ -400,6 +501,20 @@ function authenticateWs(req) {
 
 function pushLog(room, message) {
   broadcast(room, { type: "log", message, at: Date.now() });
+}
+
+async function logAdminAction(adminId, action, detail) {
+  await run(
+    `INSERT INTO admin_logs (admin_id, action, detail, created_at)
+     VALUES (?, ?, ?, ?)`,
+    [adminId, action, detail || null, nowIso()]
+  );
+}
+
+function broadcastSystemMessage(message) {
+  rooms.forEach((room) => {
+    pushLog(room, `[系统] ${message}`);
+  });
 }
 
 function closeSpectators(room) {
@@ -609,6 +724,9 @@ wss.on("connection", async (ws, req) => {
           (row) => {
             if (!row) {
               throw new Error("Unauthorized");
+            }
+            if (row.status === "banned") {
+              throw new Error("Banned");
             }
             user = sanitizeUser(row);
             ws.user = user;
@@ -853,6 +971,224 @@ app.get("/api/rooms", authRequired, (req, res) => {
     status: getRoomState(room).status,
   }));
   res.json({ rooms: list });
+});
+
+app.post("/admin/login", async (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+    if (!username || !password) {
+      res.status(400).json({ error: "请输入账号和密码" });
+      return;
+    }
+    const admin = await get("SELECT * FROM admin_users WHERE username = ?", [
+      username,
+    ]);
+    if (!admin) {
+      res.status(401).json({ error: "账号或密码错误" });
+      return;
+    }
+    const ok = await bcrypt.compare(password, admin.password_hash);
+    if (!ok) {
+      res.status(401).json({ error: "账号或密码错误" });
+      return;
+    }
+    const token = signAdminToken(admin);
+    res.cookie(ADMIN_COOKIE, token, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+    });
+    res.json({ admin: { id: admin.id, username: admin.username } });
+  } catch (error) {
+    res.status(500).json({ error: "登录失败" });
+  }
+});
+
+app.post("/admin/logout", (req, res) => {
+  res.clearCookie(ADMIN_COOKIE, { path: "/" });
+  res.json({ ok: true });
+});
+
+app.get("/admin/me", adminRequired, (req, res) => {
+  res.json({ admin: { id: req.admin.id, username: req.admin.username } });
+});
+
+app.get("/admin/users", adminRequired, async (req, res) => {
+  const query = String(req.query.query || "").trim();
+  const like = `%${query}%`;
+  const rows = await all(
+    `SELECT id, username, email, phone, nickname, signature, status, created_at
+     FROM users
+     WHERE ? = '' OR username LIKE ? OR nickname LIKE ? OR email LIKE ?
+     ORDER BY created_at DESC
+     LIMIT 200`,
+    [query, like, like, like]
+  );
+  res.json({ users: rows });
+});
+
+app.patch("/admin/users/:id", adminRequired, async (req, res) => {
+  const userId = Number.parseInt(req.params.id, 10);
+  const { nickname, signature, status } = req.body || {};
+  if (!Number.isInteger(userId)) {
+    res.status(400).json({ error: "参数错误" });
+    return;
+  }
+  await run(
+    `UPDATE users SET nickname = ?, signature = ?, status = ? WHERE id = ?`,
+    [
+      nickname === undefined ? null : nickname,
+      signature === undefined ? null : signature,
+      status || "active",
+      userId,
+    ]
+  );
+  await logAdminAction(req.admin.id, "update_user", `user=${userId}`);
+  res.json({ ok: true });
+});
+
+app.post("/admin/users/:id/reset_password", adminRequired, async (req, res) => {
+  const userId = Number.parseInt(req.params.id, 10);
+  const { password } = req.body || {};
+  if (!Number.isInteger(userId) || !password || password.length < 6) {
+    res.status(400).json({ error: "参数错误" });
+    return;
+  }
+  const passwordHash = await bcrypt.hash(password, 10);
+  await run(`UPDATE users SET password_hash = ? WHERE id = ?`, [
+    passwordHash,
+    userId,
+  ]);
+  await logAdminAction(req.admin.id, "reset_password", `user=${userId}`);
+  res.json({ ok: true });
+});
+
+app.get("/admin/matches", adminRequired, async (req, res) => {
+  const rows = await all(
+    `SELECT m.*, 
+            u1.username as p1_name,
+            u2.username as p2_name,
+            uw.username as winner_name
+     FROM matches m
+     LEFT JOIN users u1 ON u1.id = m.player1_id
+     LEFT JOIN users u2 ON u2.id = m.player2_id
+     LEFT JOIN users uw ON uw.id = m.winner_id
+     ORDER BY m.ended_at DESC
+     LIMIT 200`
+  );
+  res.json({ matches: rows });
+});
+
+app.delete("/admin/matches/:id", adminRequired, async (req, res) => {
+  const matchId = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(matchId)) {
+    res.status(400).json({ error: "参数错误" });
+    return;
+  }
+  await run(`DELETE FROM matches WHERE id = ?`, [matchId]);
+  await logAdminAction(req.admin.id, "delete_match", `match=${matchId}`);
+  res.json({ ok: true });
+});
+
+app.get("/admin/rooms", adminRequired, (req, res) => {
+  const list = Array.from(rooms.values()).map((room) => ({
+    code: room.code,
+    playersCount: room.players.filter(Boolean).length,
+    spectatorsCount: room.spectators ? room.spectators.length : 0,
+    status: getRoomState(room).status,
+  }));
+  res.json({ rooms: list });
+});
+
+app.post("/admin/rooms/:code/close", adminRequired, (req, res) => {
+  const code = String(req.params.code || "").toUpperCase();
+  const room = rooms.get(code);
+  if (!room) {
+    res.status(404).json({ error: "房间不存在" });
+    return;
+  }
+  room.players.forEach((player) => {
+    if (player && player.ws && player.ws.readyState === WebSocket.OPEN) {
+      player.ws.close(1000, "Room closed");
+    }
+  });
+  closeSpectators(room);
+  rooms.delete(code);
+  logAdminAction(req.admin.id, "close_room", `room=${code}`);
+  res.json({ ok: true });
+});
+
+app.get("/admin/announcements", adminRequired, async (req, res) => {
+  const rows = await all(
+    `SELECT id, title, body, active, created_at
+     FROM announcements
+     ORDER BY created_at DESC
+     LIMIT 200`
+  );
+  res.json({ announcements: rows });
+});
+
+app.post("/admin/announcements", adminRequired, async (req, res) => {
+  const { title, body, active } = req.body || {};
+  if (!title || !body) {
+    res.status(400).json({ error: "标题和内容必填" });
+    return;
+  }
+  await run(
+    `INSERT INTO announcements (title, body, active, created_at)
+     VALUES (?, ?, ?, ?)`,
+    [title, body, active ? 1 : 0, nowIso()]
+  );
+  await logAdminAction(req.admin.id, "create_announcement", title);
+  res.json({ ok: true });
+});
+
+app.patch("/admin/announcements/:id", adminRequired, async (req, res) => {
+  const announcementId = Number.parseInt(req.params.id, 10);
+  const { title, body, active } = req.body || {};
+  if (!Number.isInteger(announcementId)) {
+    res.status(400).json({ error: "参数错误" });
+    return;
+  }
+  await run(
+    `UPDATE announcements SET title = ?, body = ?, active = ? WHERE id = ?`,
+    [title, body, active ? 1 : 0, announcementId]
+  );
+  await logAdminAction(req.admin.id, "update_announcement", `id=${announcementId}`);
+  res.json({ ok: true });
+});
+
+app.delete("/admin/announcements/:id", adminRequired, async (req, res) => {
+  const announcementId = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(announcementId)) {
+    res.status(400).json({ error: "参数错误" });
+    return;
+  }
+  await run(`DELETE FROM announcements WHERE id = ?`, [announcementId]);
+  await logAdminAction(req.admin.id, "delete_announcement", `id=${announcementId}`);
+  res.json({ ok: true });
+});
+
+app.post("/admin/broadcast", adminRequired, async (req, res) => {
+  const { message } = req.body || {};
+  if (!message) {
+    res.status(400).json({ error: "请输入消息" });
+    return;
+  }
+  broadcastSystemMessage(message);
+  await logAdminAction(req.admin.id, "broadcast", message);
+  res.json({ ok: true });
+});
+
+app.get("/admin/logs", adminRequired, async (req, res) => {
+  const rows = await all(
+    `SELECT l.id, l.action, l.detail, l.created_at, a.username as admin_name
+     FROM admin_logs l
+     JOIN admin_users a ON a.id = l.admin_id
+     ORDER BY l.created_at DESC
+     LIMIT 200`
+  );
+  res.json({ logs: rows });
 });
 
 const HEARTBEAT_INTERVAL_MS = 45000;
