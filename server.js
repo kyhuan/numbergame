@@ -268,8 +268,12 @@ app.get("/api/history", authRequired, async (req, res) => {
 });
 
 const server = http.createServer(app);
+server.keepAliveTimeout = 70 * 1000;
+server.headersTimeout = 75 * 1000;
+server.setTimeout(0);
 const wss = new WebSocket.Server({ server });
 const rooms = new Map();
+const TURN_DURATION_MS = 60 * 1000;
 
 function makeCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -339,6 +343,7 @@ function getRoomState(room) {
     status: room.status,
     spectatorsCount: room.spectators.length,
     history: room.history.slice(-12),
+    turnDeadline: room.turnDeadline,
     players: room.players.map((player) =>
       player
         ? {
@@ -362,6 +367,7 @@ function resetRoom(room) {
   room.diceHistory = [];
   room.history = [];
   room.startedAt = null;
+  room.turnDeadline = null;
   room.status = "waiting";
   if (!room.spectators) {
     room.spectators = [];
@@ -393,7 +399,7 @@ function authenticateWs(req) {
 }
 
 function pushLog(room, message) {
-  broadcast(room, { type: "log", message });
+  broadcast(room, { type: "log", message, at: Date.now() });
 }
 
 function closeSpectators(room) {
@@ -485,6 +491,7 @@ function handleDiceRoll(room, playerIndex) {
     return;
   }
   room.currentTurn = room.dice[0] > room.dice[1] ? 0 : 1;
+  room.turnDeadline = Date.now() + TURN_DURATION_MS;
   room.started = true;
   room.startedAt = nowIso();
   pushLog(room, `玩家${room.currentTurn + 1}先手。`);
@@ -562,8 +569,10 @@ async function handleGuess(room, playerIndex, digits) {
   });
   if (correct === 4) {
     room.winner = playerIndex;
+    room.turnDeadline = null;
   } else {
     room.currentTurn = opponentIndex;
+    room.turnDeadline = Date.now() + TURN_DURATION_MS;
   }
   broadcast(room, { type: "state", state: getRoomState(room) });
   pushLog(
@@ -579,8 +588,10 @@ async function handleGuess(room, playerIndex, digits) {
 wss.on("connection", async (ws, req) => {
   try {
     ws.isAlive = true;
+    ws.missedPongs = 0;
     ws.on("pong", () => {
       ws.isAlive = true;
+      ws.missedPongs = 0;
     });
     const payload = authenticateWs(req);
     if (!payload) {
@@ -613,6 +624,8 @@ wss.on("connection", async (ws, req) => {
     let spectatorRef = null;
 
     ws.on("message", async (raw) => {
+      ws.isAlive = true;
+      ws.missedPongs = 0;
       let currentUser;
       try {
         currentUser = await ensureUser();
@@ -641,6 +654,7 @@ wss.on("connection", async (ws, req) => {
           spectators: [],
           secrets: [null, null],
           currentTurn: null,
+          turnDeadline: null,
           winner: null,
           started: false,
           lastResult: null,
@@ -841,11 +855,14 @@ app.get("/api/rooms", authRequired, (req, res) => {
   res.json({ rooms: list });
 });
 
-const HEARTBEAT_INTERVAL_MS = 30000;
+const HEARTBEAT_INTERVAL_MS = 45000;
 const heartbeat = setInterval(() => {
   wss.clients.forEach((ws) => {
     if (ws.isAlive === false) {
-      ws.terminate();
+      ws.missedPongs = (ws.missedPongs || 0) + 1;
+      if (ws.missedPongs >= 3) {
+        ws.terminate();
+      }
       return;
     }
     ws.isAlive = false;
@@ -853,8 +870,31 @@ const heartbeat = setInterval(() => {
   });
 }, HEARTBEAT_INTERVAL_MS);
 
+const TURN_TICK_MS = 1000;
+const turnTimer = setInterval(() => {
+  const now = Date.now();
+  rooms.forEach((room) => {
+    if (!room.started || room.winner !== null) {
+      return;
+    }
+    if (room.currentTurn === null || !room.turnDeadline) {
+      return;
+    }
+    if (now < room.turnDeadline) {
+      return;
+    }
+    const previous = room.currentTurn;
+    const next = previous === 0 ? 1 : 0;
+    room.currentTurn = next;
+    room.turnDeadline = now + TURN_DURATION_MS;
+    pushLog(room, `玩家${previous + 1}超时，轮到玩家${next + 1}。`);
+    broadcast(room, { type: "state", state: getRoomState(room) });
+  });
+}, TURN_TICK_MS);
+
 server.on("close", () => {
   clearInterval(heartbeat);
+  clearInterval(turnTimer);
 });
 
 const PORT = process.env.PORT || 3000;

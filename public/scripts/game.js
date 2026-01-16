@@ -9,6 +9,7 @@ const submitGuessButton = document.getElementById("submitGuess");
 const resetButton = document.getElementById("resetGame");
 const secretStatus = document.getElementById("secretStatus");
 const turnStatus = document.getElementById("turnStatus");
+const turnTimer = document.getElementById("turnTimer");
 const logContainer = document.getElementById("log");
 const logoutBtn = document.getElementById("logoutBtn");
 const recentGuessesEl = document.getElementById("recentGuesses");
@@ -25,6 +26,7 @@ let joinRequest = null;
 let lastRoomCode = null;
 let reconnectTimer = null;
 let reconnectAttempts = 0;
+let timerInterval = null;
 
 rollDiceButton.disabled = true;
 submitGuessButton.disabled = true;
@@ -37,10 +39,24 @@ const statusLabels = {
   finished: "已结束",
 };
 
-function logMessage(message) {
+function formatTime(value) {
+  const date = new Date(value);
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${hours}:${minutes}:${seconds}`;
+}
+
+function logMessage(message, at) {
   const entry = document.createElement("div");
   entry.className = "log-entry";
-  entry.textContent = message;
+  const time = document.createElement("div");
+  time.className = "log-time";
+  time.textContent = formatTime(at || Date.now());
+  const text = document.createElement("div");
+  text.textContent = message;
+  entry.appendChild(time);
+  entry.appendChild(text);
   logContainer.prepend(entry);
 }
 
@@ -80,18 +96,43 @@ function renderRecentGuesses() {
     if (entry.correct === 4) {
       item.classList.add("hit");
     }
+    const time = entry.at ? formatTime(entry.at) : "--:--:--";
     item.innerHTML = `
       <strong>${entry.guess.join("")}</strong>
-      <span class="guess-score">${entry.correct} 正确</span>
+      <span class="guess-right">
+        <span class="guess-score">${entry.correct} 正确</span>
+        <span class="log-time">${time}</span>
+      </span>
     `;
     recentGuessesEl.appendChild(item);
   });
+}
+
+function updateTurnTimer() {
+  if (!turnTimer) {
+    return;
+  }
+  if (!currentState || currentState.currentTurn === null || !currentState.turnDeadline) {
+    turnTimer.textContent = "--";
+    return;
+  }
+  const remainingMs = currentState.turnDeadline - Date.now();
+  const seconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  turnTimer.textContent = `剩余 ${seconds}s`;
+}
+
+function ensureTimerInterval() {
+  if (timerInterval) {
+    return;
+  }
+  timerInterval = setInterval(updateTurnTimer, 1000);
 }
 
 function renderState() {
   if (!currentState) {
     return;
   }
+  ensureTimerInterval();
   roomStatus.textContent =
     statusLabels[currentState.status] || currentState.status;
   if (role === "spectator") {
@@ -106,6 +147,7 @@ function renderState() {
     diceP1.textContent = currentState.dice?.[0] || "-";
     diceP2.textContent = currentState.dice?.[1] || "-";
     renderRecentGuesses();
+    updateTurnTimer();
     return;
   }
   if (playerIndex === null) {
@@ -138,6 +180,7 @@ function renderState() {
     submitGuessButton.disabled = true;
     setInputsDisabled(guessInputs, true);
     renderRecentGuesses();
+    updateTurnTimer();
     return;
   }
 
@@ -154,6 +197,7 @@ function renderState() {
     submitGuessButton.disabled = true;
     setInputsDisabled(guessInputs, true);
     renderRecentGuesses();
+    updateTurnTimer();
     return;
   }
 
@@ -167,6 +211,7 @@ function renderState() {
     setInputsDisabled(guessInputs, true);
   }
   renderRecentGuesses();
+  updateTurnTimer();
 }
 
 function autoAdvance(inputs) {
@@ -245,7 +290,7 @@ function connectAndJoin(mode, code, spectator, isReconnect) {
       renderState();
     }
     if (data.type === "log") {
-      logMessage(data.message);
+      logMessage(data.message, data.at);
     }
     if (data.type === "error") {
       logMessage(`错误: ${data.message}`);
