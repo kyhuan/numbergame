@@ -19,9 +19,10 @@ app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 
-const dataDir = path.join(__dirname, "data");
-fs.mkdirSync(dataDir, { recursive: true });
-const db = new sqlite3.Database(path.join(dataDir, "numbergame.db"));
+const DB_PATH =
+  process.env.DB_PATH || path.join(__dirname, "data", "numbergame.db");
+fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+const db = new sqlite3.Database(DB_PATH);
 
 function nowIso() {
   return new Date().toISOString();

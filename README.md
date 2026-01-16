@@ -20,16 +20,22 @@ npm start
 ## 环境变量
 - `JWT_SECRET`：登录签名密钥（必填，强随机）。
 - `ADMIN_USERNAME` / `ADMIN_PASSWORD`：初始管理员账号（首次启动时创建）。
+- `DB_PATH`：SQLite 数据库存放路径（建议放到仓库外）。
 
 ## 生产部署（Linux）
 ```bash
 export JWT_SECRET="你的强随机密钥"
 export ADMIN_USERNAME="admin"
 export ADMIN_PASSWORD="admin"
+export DB_PATH="/var/lib/numbergame/numbergame.db"
 
 pm2 start server.js --name numbergame
 pm2 save
 ```
+
+## 数据库说明
+`data/numbergame.db` 不再纳入 Git。生产环境建议将数据库放到
+`/var/lib/numbergame/` 等独立目录，避免 `git pull` 冲突。
 
 ## 目录结构
 - `server.js`：Express + WebSocket 服务端
