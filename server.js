@@ -342,7 +342,7 @@ function getRoomState(room) {
     dice: room.dice,
     status: room.status,
     spectatorsCount: room.spectators.length,
-    history: room.history.slice(-12),
+    history: room.history,
     turnDeadline: room.turnDeadline,
     players: room.players.map((player) =>
       player

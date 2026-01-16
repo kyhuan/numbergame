@@ -85,7 +85,7 @@ function renderRecentGuesses() {
   }
   const history = currentState.history || [];
   const mine = history.filter((entry) => entry.by === playerIndex);
-  const recent = mine.slice(-4);
+  const recent = mine;
   if (!recent.length) {
     recentGuessesEl.textContent = "暂无记录。";
     return;

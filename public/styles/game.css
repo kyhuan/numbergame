@@ -46,6 +46,9 @@
 .guess-list {
   display: grid;
   gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .guess-item {
