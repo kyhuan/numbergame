@@ -11,6 +11,7 @@ const secretStatus = document.getElementById("secretStatus");
 const turnStatus = document.getElementById("turnStatus");
 const logContainer = document.getElementById("log");
 const logoutBtn = document.getElementById("logoutBtn");
+const recentGuessesEl = document.getElementById("recentGuesses");
 
 const secretInputs = Array.from(document.querySelectorAll("#secretRow .digit"));
 const guessInputs = Array.from(document.querySelectorAll("#guessRow .digit"));
@@ -20,6 +21,10 @@ let playerIndex = null;
 let currentState = null;
 let role = "player";
 let selfUser = null;
+let joinRequest = null;
+let lastRoomCode = null;
+let reconnectTimer = null;
+let reconnectAttempts = 0;
 
 rollDiceButton.disabled = true;
 submitGuessButton.disabled = true;
@@ -53,6 +58,36 @@ function setInputsDisabled(inputs, disabled) {
   });
 }
 
+function renderRecentGuesses() {
+  if (!recentGuessesEl) {
+    return;
+  }
+  recentGuessesEl.innerHTML = "";
+  if (!currentState || role === "spectator" || playerIndex === null) {
+    recentGuessesEl.textContent = "暂无记录。";
+    return;
+  }
+  const history = currentState.history || [];
+  const mine = history.filter((entry) => entry.by === playerIndex);
+  const recent = mine.slice(-4);
+  if (!recent.length) {
+    recentGuessesEl.textContent = "暂无记录。";
+    return;
+  }
+  recent.forEach((entry) => {
+    const item = document.createElement("div");
+    item.className = "guess-item";
+    if (entry.correct === 4) {
+      item.classList.add("hit");
+    }
+    item.innerHTML = `
+      <strong>${entry.guess.join("")}</strong>
+      <span class="guess-score">${entry.correct} 正确</span>
+    `;
+    recentGuessesEl.appendChild(item);
+  });
+}
+
 function renderState() {
   if (!currentState) {
     return;
@@ -70,6 +105,7 @@ function renderState() {
     setInputsDisabled(guessInputs, true);
     diceP1.textContent = currentState.dice?.[0] || "-";
     diceP2.textContent = currentState.dice?.[1] || "-";
+    renderRecentGuesses();
     return;
   }
   if (playerIndex === null) {
@@ -101,6 +137,7 @@ function renderState() {
       currentState.winner === playerIndex ? "你赢了!" : "你输了。";
     submitGuessButton.disabled = true;
     setInputsDisabled(guessInputs, true);
+    renderRecentGuesses();
     return;
   }
 
@@ -116,6 +153,7 @@ function renderState() {
     }
     submitGuessButton.disabled = true;
     setInputsDisabled(guessInputs, true);
+    renderRecentGuesses();
     return;
   }
 
@@ -128,13 +166,30 @@ function renderState() {
     submitGuessButton.disabled = true;
     setInputsDisabled(guessInputs, true);
   }
+  renderRecentGuesses();
 }
 
 function autoAdvance(inputs) {
   inputs.forEach((input, index) => {
+    input.addEventListener("focus", (event) => {
+      event.target.select();
+    });
     input.addEventListener("input", (event) => {
-      event.target.value = event.target.value.replace(/[^0-9]/g, "");
-      if (event.target.value.length === 1 && inputs[index + 1]) {
+      const digits = event.target.value.replace(/[^0-9]/g, "");
+      const value = digits ? digits[digits.length - 1] : "";
+      event.target.value = value;
+      if (value && inputs[index + 1]) {
+        inputs[index + 1].focus();
+      }
+    });
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Backspace" && !event.target.value && inputs[index - 1]) {
+        inputs[index - 1].focus();
+      }
+      if (event.key === "ArrowLeft" && inputs[index - 1]) {
+        inputs[index - 1].focus();
+      }
+      if (event.key === "ArrowRight" && inputs[index + 1]) {
         inputs[index + 1].focus();
       }
     });
@@ -149,7 +204,13 @@ function send(payload) {
   socket.send(JSON.stringify(payload));
 }
 
-function connectAndJoin(mode, code, spectator) {
+function connectAndJoin(mode, code, spectator, isReconnect) {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.close();
+  }
+  if (!isReconnect) {
+    joinRequest = { mode, code, spectator };
+  }
   socket = new WebSocket(
     `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`
   );
@@ -168,6 +229,8 @@ function connectAndJoin(mode, code, spectator) {
       playerIndex = data.playerIndex;
       role = data.role || "player";
       roomCodeLabel.textContent = data.code;
+      lastRoomCode = data.code;
+      reconnectAttempts = 0;
       if (role === "spectator") {
         playerLabel.textContent = "观战";
         logMessage(`进入房间 ${data.code}（观战）。`);
@@ -190,7 +253,20 @@ function connectAndJoin(mode, code, spectator) {
   });
 
   socket.addEventListener("close", () => {
-    logMessage("连接已断开，请返回大厅重试。");
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+    }
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 15000);
+    reconnectAttempts += 1;
+    logMessage(`连接已断开，${delay / 1000}s 后重连。`);
+    reconnectTimer = setTimeout(() => {
+      if (!joinRequest) {
+        return;
+      }
+      const rejoinCode = lastRoomCode || joinRequest.code;
+      const rejoinMode = rejoinCode ? "join" : joinRequest.mode;
+      connectAndJoin(rejoinMode, rejoinCode, joinRequest.spectator, true);
+    }, delay);
   });
 }
 
@@ -210,6 +286,10 @@ submitGuessButton.addEventListener("click", () => {
     return;
   }
   send({ type: "guess", digits });
+  guessInputs.forEach((input) => {
+    input.value = "";
+  });
+  guessInputs[0]?.focus();
 });
 
 rollDiceButton.addEventListener("click", () => {

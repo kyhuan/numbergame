@@ -24,6 +24,43 @@
   align-items: center;
 }
 
+.guess-summary {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.guess-list {
+  display: grid;
+  gap: 6px;
+}
+
+.guess-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(47, 112, 108, 0.1);
+  font-weight: 600;
+}
+
+.guess-item strong {
+  letter-spacing: 0.2em;
+}
+
+.guess-score {
+  background: #1c1b1f;
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+}
+
+.guess-item.hit {
+  background: rgba(240, 93, 35, 0.16);
+}
+
 .dice-panel {
   display: grid;
   grid-template-columns: 1fr auto;

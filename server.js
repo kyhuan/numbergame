@@ -311,6 +311,9 @@ function getRoomState(room) {
   if (!room.spectators) {
     room.spectators = [];
   }
+  if (!room.history) {
+    room.history = [];
+  }
   const playersCount = room.players.filter(Boolean).length;
   let status = "waiting";
   if (room.winner !== null) {
@@ -335,6 +338,7 @@ function getRoomState(room) {
     dice: room.dice,
     status: room.status,
     spectatorsCount: room.spectators.length,
+    history: room.history.slice(-12),
     players: room.players.map((player) =>
       player
         ? {
@@ -416,12 +420,13 @@ function clearRoomCleanup(room) {
 
 function scheduleRoomCleanup(room) {
   clearRoomCleanup(room);
+  const ROOM_CLEANUP_MS = 30 * 60 * 1000;
   room.cleanupTimer = setTimeout(() => {
     if (!hasConnectedPlayer(room)) {
       closeSpectators(room);
       rooms.delete(room.code);
     }
-  }, 10 * 60 * 1000);
+  }, ROOM_CLEANUP_MS);
 }
 
 function cleanupRoomIfEmpty(room) {
@@ -573,6 +578,10 @@ async function handleGuess(room, playerIndex, digits) {
 
 wss.on("connection", async (ws, req) => {
   try {
+    ws.isAlive = true;
+    ws.on("pong", () => {
+      ws.isAlive = true;
+    });
     const payload = authenticateWs(req);
     if (!payload) {
       ws.close(1008, "Unauthorized");
@@ -830,6 +839,22 @@ app.get("/api/rooms", authRequired, (req, res) => {
     status: getRoomState(room).status,
   }));
   res.json({ rooms: list });
+});
+
+const HEARTBEAT_INTERVAL_MS = 30000;
+const heartbeat = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) {
+      ws.terminate();
+      return;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, HEARTBEAT_INTERVAL_MS);
+
+server.on("close", () => {
+  clearInterval(heartbeat);
 });
 
 const PORT = process.env.PORT || 3000;
